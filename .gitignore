@@ -1,0 +1,12 @@
+# Local enquiry records contain customer contact details.
+data/submissions.jsonl
+
+# Local dependencies, environment settings, and generated files.
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+dist/
+.DS_Store
+Thumbs.db
