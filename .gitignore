@@ -8,5 +8,6 @@ node_modules/
 !.env.example
 *.log
 dist/
+.wrangler/
 .DS_Store
 Thumbs.db

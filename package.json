@@ -3,6 +3,22 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node server.mjs", "dev": "node server.mjs" },
-  "engines": { "node": ">=20" }
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json",
+    "cf-typegen": "wrangler types --include-runtime=false",
+    "db:migrate:local": "wrangler d1 migrations apply ki-movers-submissions --local",
+    "db:migrate:remote": "wrangler d1 migrations apply ki-movers-submissions --remote"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261104.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.157.0"
+  }
 }
