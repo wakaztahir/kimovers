@@ -2,7 +2,7 @@ import { cp, mkdir, rm } from "node:fs/promises";
 import { build } from "esbuild";
 
 const outdir = "dist";
-const staticEntries = ["index.html", "styles.css", "robots.txt", "sitemap.xml"];
+const staticEntries = ["index.html", "styles.css", "robots.txt", "sitemap.xml", "_headers"];
 
 await rm(outdir, { recursive: true, force: true });
 await mkdir(outdir, { recursive: true });

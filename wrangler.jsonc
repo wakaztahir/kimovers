@@ -7,13 +7,14 @@
   "observability": {
     "enabled": true
   },
-  // Static site built into ./dist. Assets are served first; only /api/* runs the Worker.
-  // Unmatched page URLs fall back to index.html so the client-side router keeps working.
+  // Static site built into ./dist. Assets are served first; only the form API and
+  // the admin page run the Worker. Unmatched page URLs fall back to index.html so
+  // the client-side router keeps working.
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/admin", "/admin/*"]
   },
   // Run `npx wrangler d1 create ki-movers-submissions` once, then paste the
   // returned database_id here. The placeholder id is fine for local development.

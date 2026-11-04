@@ -1,3 +1,5 @@
+import { handleAdmin } from "./admin";
+
 type SubmissionKind = "quote" | "contact";
 
 const REQUIRED_FIELDS: Readonly<Record<SubmissionKind, readonly string[]>> = {
@@ -16,7 +18,12 @@ class BodyTooLargeError extends Error {
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" }
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+      "referrer-policy": "no-referrer"
+    }
   });
 }
 
@@ -125,6 +132,9 @@ export default {
     }
     if (request.method === "POST" && url.pathname === "/api/contact") {
       return handleSubmission(request, env, "contact");
+    }
+    if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
+      return handleAdmin(request, env);
     }
 
     // Everything else is a static asset. Unmatched page routes fall back to

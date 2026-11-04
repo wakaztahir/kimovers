@@ -1,0 +1,22 @@
+# Response headers for the static assets in ./dist. Copied there by
+# scripts/build.mjs; Cloudflare parses this file instead of serving it.
+#
+# Worker-generated responses (/api/*, /admin) are not covered by this file, so
+# worker/index.ts sets its own headers for those.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+
+# Photos, vendor scripts and the logo only change with a deploy, so let browsers
+# reuse them for a week before revalidating with the ETag. HTML, app.js and
+# styles.css keep Cloudflare's default "must revalidate" caching so a deploy is
+# visible immediately.
+/assets/*
+  Cache-Control: public, max-age=604800
