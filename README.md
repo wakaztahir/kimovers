@@ -19,9 +19,12 @@ Open <http://localhost:8787>.
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | Builds `./dist` and serves it with `wrangler dev` (local D1 included) |
-| `npm run build` | Bundles `src/app.ts` and copies the static files into `./dist` |
+| `npm run build` | Bundles the app, pre-renders every route to HTML and generates `sitemap.xml` / `robots.txt` in `./dist` |
+| `npm run verify` | Type-check, build and SEO check in one go |
+| `npm run seo:check` | Validates titles, descriptions, canonicals, structured data, links, sitemap and robots in `./dist` |
 | `npm run typecheck` | Type-checks the browser app and the Worker |
-| `npm run deploy` | Builds and deploys with `wrangler deploy` |
+| `npm run deploy` | One-command deploy: database, migrations, secrets, build, SEO check, upload |
+| `npm run deploy:dry` | Same build/check plus a Wrangler `--dry-run`, without touching Cloudflare |
 | `npm run db:migrate:local` / `db:migrate:remote` | Applies `migrations/` to the local or remote D1 database |
 | `npm run cf-typegen` | Regenerates `worker-configuration.d.ts` after changing `wrangler.jsonc` |
 
@@ -33,37 +36,39 @@ cp .dev.vars.example .dev.vars   # then edit the username and password
 
 ## Project layout
 
-- `src/app.ts` — router, page metadata, navigation, theme toggle and form handling.
+- `src/app.ts` — navigation, theme toggle, form handling and client-side metadata updates.
+- `src/site/router.ts` — the routing table: page content, titles, descriptions, canonicals and JSON-LD.
+- `src/site/shell.ts` / `src/prerender.ts` — render complete HTML documents for the build.
 - `src/site/` — page templates, shared components, header/footer and site content.
-- `src/config.ts` — company details and verified figures.
+- `src/config.ts` — company details, verified figures and the `SITE_URL` origin.
 - `src/data/reviews.ts` — review content.
 - `worker/index.ts` — the Worker: `POST /api/quote` and `POST /api/contact` write to D1,
   `/admin` lists submissions, everything else is served from the static assets in `./dist`.
 - `worker/admin.ts` — the authenticated submissions page.
 - `_headers` — security and caching headers for the static assets.
 - `migrations/` — D1 schema.
-- `scripts/build.mjs` — esbuild bundle plus static file copy.
-- `index.html`, `styles.css`, `robots.txt`, `sitemap.xml`, `assets/` — static files,
-  copied into `./dist` at build time.
+- `scripts/build.mjs` — esbuild bundle, pre-render, sitemap/robots generation, static copy.
+- `scripts/seo-check.mjs` — SEO validation for the built site.
+- `scripts/deploy.mjs` — idempotent deploy (D1, migrations, secrets, build, check, upload).
+- `styles.css`, `_headers`, `assets/` — static files copied into `./dist` at build time.
+- `docs/DEPLOYMENT.md`, `docs/SEO.md` — deployment steps and how the metadata works.
 
 ## Deploying to Cloudflare Workers
 
-1. Authenticate once: `npx wrangler login`.
-2. Create the database: `npx wrangler d1 create ki-movers-submissions`.
-3. Copy the returned `database_id` into `wrangler.jsonc`, replacing the placeholder.
-4. Apply the schema: `npm run db:migrate:remote`.
-5. Set the admin credentials:
+```bash
+npx wrangler login          # once per machine
+SITE_URL=https://your-domain.com npm run deploy
+```
 
-   ```bash
-   npx wrangler secret put ADMIN_USERNAME
-   npx wrangler secret put ADMIN_PASSWORD
-   ```
+The script creates or reuses the D1 database, applies migrations, sets the admin
+secrets if they are missing, builds with `SITE_URL`, runs the SEO check and deploys.
+It is safe to run again. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the manual
+steps, custom domains, CI and troubleshooting.
 
-6. Deploy: `npm run deploy`.
-
-Routing is configured in `wrangler.jsonc`: assets are served first, only `/api/*`
-runs the Worker, and unknown page URLs fall back to `index.html` so the
-client-side router keeps working.
+Every route is pre-rendered to its own HTML file, so Cloudflare serves them straight
+from `./dist`: `/about` comes from `about.html`, `/about/` redirects to `/about`, and
+unknown URLs get `404.html` with a real `404` status. Only `/api/*` and `/admin*`
+run the Worker.
 
 ### Submissions
 
@@ -110,8 +115,8 @@ admin CSP).
 ## Before launch
 
 - Update the central company details and verified figures in `src/config.ts`.
-- Replace `https://example.com` in `src/config.ts`, `index.html`, `robots.txt` and
-  `sitemap.xml` with the production domain.
+- Deploy with the production `SITE_URL` so canonicals, the sitemap and robots.txt
+  carry the real domain.
 - Replace placeholder review content with permissioned, verified customer feedback.
 - Update the privacy and terms text to match the operator's actual policies; note
   that enquiry records now live in D1.

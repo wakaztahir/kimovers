@@ -1,23 +1,7 @@
-import { business as biz } from "./config";
-import { areas, posts, services } from "./site/content";
-import { escapeHtml, svgArrow } from "./site/html";
-import { areaSlug, servicePath } from "./site/components";
+import { siteUrl } from "./config";
 import { footer, header } from "./site/chrome";
-import {
-  aboutPage,
-  areaPage,
-  areasPage,
-  blogPage,
-  contactPage,
-  galleryPage,
-  home,
-  legalPage,
-  notFound,
-  postPage,
-  quotePage,
-  servicePage,
-  servicesPage
-} from "./site/pages";
+import { escapeHtml, svgArrow } from "./site/html";
+import { type PageMeta, resolveRoute } from "./site/router";
 
 interface BirdsEffect {
   destroy: () => void;
@@ -139,37 +123,66 @@ function startHeroBirds(): void {
   }
 }
 
-function setMeta(title: string, description: string, path: string): void {
-  document.title = title;
-  const descriptionMeta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-  if (descriptionMeta) descriptionMeta.content = description;
-  const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-  if (canonical) canonical.href = `${biz.website}${path}`;
-  const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]');
-  if (ogTitle) ogTitle.content = title;
-  const ogDescription = document.querySelector<HTMLMetaElement>('meta[property="og:description"]');
-  if (ogDescription) ogDescription.content = description;
-  const structuredData = document.getElementById("structured-data");
-  if (structuredData) {
-    structuredData.textContent = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "MovingCompany",
-      name: biz.name,
-      url: biz.website,
-      telephone: biz.phoneLink || undefined,
-      email: biz.email.includes("[") ? undefined : biz.email,
-      address: { "@type": "PostalAddress", addressLocality: "Dubai", addressCountry: "AE" },
-      areaServed: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah"],
-      hasOfferCatalog: {
-        "@type": "OfferCatalog",
-        name: "Moving and relocation services",
-        itemListElement: services.map((service) => ({
-          "@type": "Offer",
-          itemOffered: { "@type": "Service", name: service.title, url: `${biz.website}${servicePath(service)}` }
-        }))
-      }
-    });
+function setMetaContent(selector: string, content: string): void {
+  const element = document.querySelector<HTMLMetaElement>(selector);
+  if (element) element.content = content;
+}
+
+function setCanonical(href: string | null): void {
+  let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (!href) {
+    link?.remove();
+    return;
   }
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "canonical";
+    document.head.append(link);
+  }
+  link.href = href;
+}
+
+function setRobots(value: string | null): void {
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+  if (!value) {
+    meta?.remove();
+    return;
+  }
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "robots";
+    document.head.append(meta);
+  }
+  meta.content = value;
+}
+
+function setStructuredData(jsonLd: PageMeta["jsonLd"]): void {
+  let script = document.querySelector<HTMLScriptElement>("#structured-data");
+  if (jsonLd.length === 0) {
+    script?.remove();
+    return;
+  }
+  if (!script) {
+    script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.id = "structured-data";
+    document.head.append(script);
+  }
+  script.textContent = JSON.stringify(jsonLd);
+}
+
+/** Keeps the document head in sync when the client-side router changes page. */
+function applyMeta(meta: PageMeta): void {
+  document.title = meta.title;
+  setMetaContent('meta[name="description"]', meta.description);
+  setMetaContent('meta[property="og:title"]', meta.title);
+  setMetaContent('meta[property="og:description"]', meta.description);
+  setMetaContent('meta[property="og:url"]', meta.canonical ?? `${siteUrl}${meta.path}`);
+  setMetaContent('meta[name="twitter:title"]', meta.title);
+  setMetaContent('meta[name="twitter:description"]', meta.description);
+  setCanonical(meta.canonical);
+  setRobots(meta.robots);
+  setStructuredData(meta.jsonLd);
 }
 
 function bindPageMotion(): void {
@@ -210,60 +223,14 @@ function mount(): void {
   heroBirdsEffect?.destroy();
   heroBirdsEffect = null;
   document.querySelector(".hero")?.classList.remove("has-birds-background");
-  const path = decodeURI(location.pathname).replace(/\/$/, "") || "/";
+  const route = resolveRoute(location.pathname);
+  const path = route.meta.path;
   document.body.classList.toggle("quote-page", path === "/quote");
-  const seg = path.split("/").filter(Boolean);
-  let body: string;
-  let title = `${biz.name} | Movers and Packers in Dubai`;
-  let desc = "Thoughtful home, villa and office moving in Dubai and across the UAE.";
-
-  if (path === "/") {
-    body = home();
-  } else if (path === "/about") {
-    body = aboutPage();
-    title = `About | ${biz.name}`;
-  } else if (path === "/services") {
-    body = servicesPage();
-    title = `Moving Services in Dubai | ${biz.name}`;
-  } else if (seg[0] === "services" && seg[1]) {
-    body = servicePage(seg[1]) ?? notFound();
-    title = `${services.find((service) => service.slug === seg[1])?.title ?? "Moving"} in Dubai | ${biz.name}`;
-  } else if (path === "/areas") {
-    body = areasPage();
-    title = `Areas We Serve | ${biz.name}`;
-  } else if (seg[0] === "areas" && seg[1]) {
-    body = areaPage(seg[1]) ?? notFound();
-    title = `Movers in ${areas.find((area) => areaSlug(area) === seg[1]) ?? "Dubai"} | ${biz.name}`;
-  } else if (path === "/gallery") {
-    body = galleryPage();
-    title = `Moving Gallery | ${biz.name}`;
-  } else if (path === "/blog") {
-    body = blogPage();
-    title = `Moving Journal | ${biz.name}`;
-  } else if (seg[0] === "blog" && seg[1]) {
-    body = postPage(seg[1]) ?? notFound();
-    title = `${posts.find((post) => post.slug === seg[1])?.title ?? "Moving Journal"} | ${biz.name}`;
-  } else if (path === "/quote") {
-    body = quotePage();
-    title = `Get a Moving Quote | ${biz.name}`;
-  } else if (path === "/contact") {
-    body = contactPage();
-    title = `Contact | ${biz.name}`;
-  } else if (path === "/privacy") {
-    body = legalPage("privacy");
-    title = `Privacy | ${biz.name}`;
-  } else if (path === "/terms") {
-    body = legalPage("terms");
-    title = `Terms | ${biz.name}`;
-  } else {
-    body = notFound();
-  }
-
-  app.innerHTML = header() + body + footer();
+  app.innerHTML = header() + route.html + footer();
   app.classList.remove("route-enter");
   void app.offsetWidth;
   app.classList.add("route-enter");
-  setMeta(title, desc, path);
+  applyMeta(route.meta);
   bind();
   bindPageMotion();
   if (path === "/") startHeroBirds();

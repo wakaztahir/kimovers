@@ -6,7 +6,10 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:dry": "node scripts/deploy.mjs --dry-run",
+    "seo:check": "node scripts/seo-check.mjs",
+    "verify": "npm run typecheck && npm run build && npm run seo:check",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json",
     "cf-typegen": "wrangler types --include-runtime=false",
     "db:migrate:local": "wrangler d1 migrations apply ki-movers-submissions --local",

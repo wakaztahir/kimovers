@@ -10,6 +10,7 @@ node_modules/
 !.dev.vars.example
 *.log
 dist/
+.build/
 .wrangler/
 .DS_Store
 Thumbs.db

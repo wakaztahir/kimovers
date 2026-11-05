@@ -7,13 +7,12 @@
   "observability": {
     "enabled": true
   },
-  // Static site built into ./dist. Assets are served first; only the form API and
-  // the admin page run the Worker. Unmatched page URLs fall back to index.html so
-  // the client-side router keeps working.
+  // Static site built into ./dist. Every route is pre-rendered to its own HTML
+  // file, so assets are served directly and unknown URLs get a real 404.
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
+    "not_found_handling": "404-page",
     "run_worker_first": ["/api/*", "/admin", "/admin/*"]
   },
   // Run `npx wrangler d1 create ki-movers-submissions` once, then paste the
