@@ -15,7 +15,7 @@ project root.
 
 ```bash
 npx wrangler login          # once per machine
-SITE_URL=https://your-domain.com npm run deploy
+npm run deploy
 ```
 
 That is the whole first deploy. `scripts/deploy.mjs` is idempotent and will:
@@ -25,7 +25,7 @@ That is the whole first deploy. `scripts/deploy.mjs` is idempotent and will:
    write its `database_id` into `wrangler.jsonc` (or reuse the existing one).
 3. Apply `migrations/` to the remote database.
 4. Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` secrets if they are missing.
-5. Build the site with `SITE_URL`.
+5. Build the site with the production origin (`https://kimovers.com`).
 6. Run `npm run seo:check` and abort the deploy if it fails.
 7. Run `wrangler deploy` and print the canonical origin.
 
@@ -39,8 +39,7 @@ it once:
 Store it somewhere safe, or set your own before deploying:
 
 ```bash
-ADMIN_USERNAME=admin ADMIN_PASSWORD='a long unique password' \
-  SITE_URL=https://your-domain.com npm run deploy
+ADMIN_USERNAME=admin ADMIN_PASSWORD='a long unique password' npm run deploy
 ```
 
 Running the command again is safe: the database, migrations and secrets are reused.
@@ -48,21 +47,28 @@ Running the command again is safe: the database, migrations and secrets are reus
 ### Check the setup without publishing
 
 ```bash
-SITE_URL=https://your-domain.com npm run deploy:dry
+npm run deploy:dry
 ```
 
 This builds the site, runs the SEO check and does a Wrangler `--dry-run` bundle. It
 does not log in, create resources, write secrets or upload anything.
 
-### SITE_URL
+### Site URL
 
-`SITE_URL` is the production origin (`https://` + host, no trailing slash). It is
-baked into canonical tags, Open Graph URLs, JSON-LD, `sitemap.xml` and `robots.txt`
-at build time — there is no domain to edit in the source. Deploying with a
-different domain later is just another deploy with a new `SITE_URL`.
+The production origin is hard-coded to `https://kimovers.com` in `src/config.ts`
+and `scripts/build.mjs`. It is baked into canonical tags, Open Graph URLs, JSON-LD,
+`sitemap.xml` and `robots.txt` at build time, so a normal `npm run build` /
+`npm run deploy` needs no configuration.
 
-If it is missing, `npm run build` falls back to `https://example.com` and prints a
-warning; `npm run deploy` refuses to run without it, and `npm run seo:check` fails.
+`SITE_URL` (or `--site-url=…` on the deploy script) still overrides it if you ever
+preview on another host or move domains:
+
+```bash
+SITE_URL=https://staging.kimovers.com npm run deploy:dry
+```
+
+Change the domain for good by editing the two `https://kimovers.com` defaults, then
+deploy again.
 
 ## Manual deploy (CI or step by step)
 
@@ -72,8 +78,8 @@ npx wrangler d1 create ki-movers-submissions      # copy database_id into wrangl
 npx wrangler d1 migrations apply ki-movers-submissions --remote
 npx wrangler secret put ADMIN_USERNAME
 npx wrangler secret put ADMIN_PASSWORD
-SITE_URL=https://your-domain.com npm run build
-SITE_URL=https://your-domain.com npm run seo:check
+npm run build
+npm run seo:check
 npx wrangler deploy
 ```
 
@@ -89,26 +95,26 @@ Migrations skip their confirmation prompt when the process is not interactive.
 2. Attach it to the Worker with a route in `wrangler.jsonc`:
 
    ```jsonc
-   "routes": [{ "pattern": "your-domain.com", "custom_domain": true }]
+   "routes": [{ "pattern": "kimovers.com", "custom_domain": true }]
    ```
 
 3. Deploy again. TLS is issued automatically.
 
-Pick one canonical host (`https://your-domain.com` without `www`, for example),
-deploy with that `SITE_URL`, and add a Cloudflare Redirect Rule from `www` and from
-`http` so both variations land on the canonical URL. Serving the same pages on two
+The site is built for `https://kimovers.com` without `www`. Add a Cloudflare
+Redirect Rule from `www.kimovers.com` (and from `http`) so both variations land on
+the canonical URL. Serving the same pages on two
 hosts splits ranking signals even though the canonical tag points at one of them.
 
 ## After deploying
 
 ```bash
-curl -sI https://your-domain.com/about        # 200
-curl -sI https://your-domain.com/about/       # 307 to /about
-curl -sI https://your-domain.com/nope         # 404
-curl -s  https://your-domain.com/robots.txt   # sitemap URL and Disallow: /admin
+curl -sI https://kimovers.com/about        # 200
+curl -sI https://kimovers.com/about/       # 307 to /about
+curl -sI https://kimovers.com/nope         # 404
+curl -s  https://kimovers.com/robots.txt   # sitemap URL and Disallow: /admin
 ```
 
-Then submit `https://your-domain.com/sitemap.xml` in Google Search Console and
+Then submit `https://kimovers.com/sitemap.xml` in Google Search Console and
 Bing Webmaster Tools. See [SEO.md](./SEO.md) for the full post-launch checklist.
 
 ## Operations

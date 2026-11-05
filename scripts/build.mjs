@@ -5,18 +5,11 @@ import { build } from "esbuild";
 
 const outdir = "dist";
 const buildDir = ".build";
-const placeholderUrl = "https://example.com";
+const defaultSiteUrl = "https://kimovers.com";
 const rawSiteUrl = process.env.SITE_URL?.trim();
-const siteUrl = (rawSiteUrl || placeholderUrl).replace(/\/+$/, "");
+const siteUrl = (rawSiteUrl || defaultSiteUrl).replace(/\/+$/, "");
 const staticEntries = ["styles.css", "_headers"];
 const define = { __SITE_URL__: JSON.stringify(siteUrl) };
-
-if (!rawSiteUrl) {
-  console.warn(
-    `SITE_URL is not set, so canonical URLs, the sitemap and robots.txt use ${placeholderUrl}.\n` +
-      "Set SITE_URL=https://your-domain.com (or run `npm run deploy`) before going live."
-  );
-}
 
 await rm(outdir, { recursive: true, force: true });
 await rm(buildDir, { recursive: true, force: true });

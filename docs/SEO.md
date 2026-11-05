@@ -11,7 +11,7 @@ navigate.
 
 - `html` — the page template.
 - `meta.title`, `meta.description` — unique per page.
-- `meta.canonical` — absolute URL built from `SITE_URL` (`null` for the 404 page).
+- `meta.canonical` — absolute URL on the production origin (`https://kimovers.com`; `null` for the 404 page).
 - `meta.robots` — `noindex, follow` for the 404 page, `null` everywhere else.
 - `meta.jsonLd` — structured data for the page.
 - `status` — `200`, or `404` for unknown paths.
@@ -38,8 +38,8 @@ sitemap and vice versa.
 - `sitemap.xml` — every indexable route with `lastmod` set to the build date.
 - `robots.txt` — allows everything except `/admin`, and points at the sitemap.
 
-The origin in all of these comes from `SITE_URL` (see
-[DEPLOYMENT.md](./DEPLOYMENT.md)). Nothing is hard-coded.
+The origin in all of these is hard-coded to `https://kimovers.com`, with an optional
+`SITE_URL` override for previews (see [DEPLOYMENT.md](./DEPLOYMENT.md)).
 
 ## Structured data
 
@@ -82,9 +82,9 @@ The checker (`scripts/seo-check.mjs`) fails the build on:
 
 ## Post-launch checklist
 
-1. Confirm the canonical host: `https://` without `www`, serving `200`, with `/`
+1. Confirm `https://kimovers.com` (without `www`) serves `200`, with `/`
    redirecting nothing and `/about/` redirecting to `/about`.
-2. Submit `https://your-domain.com/sitemap.xml` in Google Search Console and Bing
+2. Submit `https://kimovers.com/sitemap.xml` in Google Search Console and Bing
    Webmaster Tools.
 3. Validate the home page, one service page and one article in the
    [Rich Results Test](https://search.google.com/test/rich-results).

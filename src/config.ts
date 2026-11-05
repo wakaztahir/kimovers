@@ -20,10 +20,10 @@ export interface Business {
   };
 }
 
-// The canonical origin for links, canonical tags, the sitemap and JSON-LD. The
-// build replaces __SITE_URL__ with the SITE_URL environment variable, so a
-// deploy does not need any source edits.
-export const siteUrl: string = __SITE_URL__.replace(/\/+$/, "") || "https://example.com";
+// The canonical origin for links, canonical tags, the sitemap and JSON-LD.
+// scripts/build.mjs can override it with the optional SITE_URL environment
+// variable; otherwise the production domain below is used.
+export const siteUrl: string = (__SITE_URL__ || "https://kimovers.com").replace(/\/+$/, "");
 
 export const business: Business = {
   name: "KI Movers",

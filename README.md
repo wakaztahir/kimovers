@@ -40,7 +40,7 @@ cp .dev.vars.example .dev.vars   # then edit the username and password
 - `src/site/router.ts` — the routing table: page content, titles, descriptions, canonicals and JSON-LD.
 - `src/site/shell.ts` / `src/prerender.ts` — render complete HTML documents for the build.
 - `src/site/` — page templates, shared components, header/footer and site content.
-- `src/config.ts` — company details, verified figures and the `SITE_URL` origin.
+- `src/config.ts` — company details, verified figures and the production origin (`https://kimovers.com`).
 - `src/data/reviews.ts` — review content.
 - `worker/index.ts` — the Worker: `POST /api/quote` and `POST /api/contact` write to D1,
   `/admin` lists submissions, everything else is served from the static assets in `./dist`.
@@ -57,11 +57,11 @@ cp .dev.vars.example .dev.vars   # then edit the username and password
 
 ```bash
 npx wrangler login          # once per machine
-SITE_URL=https://your-domain.com npm run deploy
+npm run deploy
 ```
 
 The script creates or reuses the D1 database, applies migrations, sets the admin
-secrets if they are missing, builds with `SITE_URL`, runs the SEO check and deploys.
+secrets if they are missing, builds, runs the SEO check and deploys.
 It is safe to run again. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the manual
 steps, custom domains, CI and troubleshooting.
 
@@ -115,8 +115,7 @@ admin CSP).
 ## Before launch
 
 - Update the central company details and verified figures in `src/config.ts`.
-- Deploy with the production `SITE_URL` so canonicals, the sitemap and robots.txt
-  carry the real domain.
+- Confirm `https://kimovers.com` is the canonical host and redirect `www` to it.
 - Replace placeholder review content with permissioned, verified customer feedback.
 - Update the privacy and terms text to match the operator's actual policies; note
   that enquiry records now live in D1.

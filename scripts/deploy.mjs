@@ -39,19 +39,11 @@ const npmRun = (script, options = {}) => {
 };
 
 // --- site URL ---------------------------------------------------------------
-let siteUrl = (cliSiteUrl || process.env.SITE_URL || "").trim().replace(/\/+$/, "");
-if (!siteUrl) {
-  const config = readFileSync(configPath, "utf8");
-  siteUrl = config.match(/"SITE_URL":\s*"([^"]+)"/)?.[1]?.replace(/\/+$/, "") ?? "";
-}
-if (!siteUrl) {
-  fail(
-    "SITE_URL is required so canonical URLs, the sitemap and robots.txt point at the real domain.\n" +
-      "  SITE_URL=https://your-domain.com npm run deploy\n" +
-      "  (or pass --site-url=https://your-domain.com)"
-  );
-}
-if (!/^https?:\/\/[^/]+/.test(siteUrl)) fail(`SITE_URL must be an absolute origin (https://…), received "${siteUrl}".`);
+// Hard-coded to the production domain; SITE_URL / --site-url=… can override it
+// for previews or a domain move.
+const defaultSiteUrl = "https://kimovers.com";
+const siteUrl = (cliSiteUrl || process.env.SITE_URL || defaultSiteUrl).trim().replace(/\/+$/, "");
+if (!/^https?:\/\/[^/]+/.test(siteUrl)) fail(`The site URL must be an absolute origin (https://…), received "${siteUrl}".`);
 
 console.log(`Deploying KI Movers${dryRun ? " (dry run)" : ""} with canonical origin ${siteUrl}`);
 
