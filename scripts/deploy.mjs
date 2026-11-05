@@ -63,9 +63,9 @@ if (!dryRun) {
   const isPlaceholder = !currentId || /^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(currentId);
 
   if (isPlaceholder) {
-    let databaseId = capture(["wrangler", "d1", "create", databaseName]).stdout?.match(
-      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
-    )?.[0];
+    const created = capture(["wrangler", "d1", "create", databaseName]);
+    const createOutput = `${created.stdout ?? ""}${created.stderr ?? ""}`.trim();
+    let databaseId = createOutput.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
 
     if (!databaseId) {
       // The database may already exist but not be wired into wrangler.jsonc.
@@ -78,7 +78,9 @@ if (!dryRun) {
       }
     }
 
-    if (!databaseId) fail(`Could not create or find the D1 database "${databaseName}".`);
+    if (!databaseId) {
+      fail(`Could not create or find the D1 database "${databaseName}".\n${createOutput}`);
+    }
     config = config.replace(/"database_id":\s*"[^"]*"/, `"database_id": "${databaseId}"`);
     writeFileSync(configPath, config);
     console.log(`  Saved database_id ${databaseId} to ${configPath}`);

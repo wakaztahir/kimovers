@@ -1,6 +1,9 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "ki-movers",
+  // Deploy into Alizskolqq@gmail.com's account, even when Wrangler is signed in
+  // to an account with several memberships.
+  "account_id": "fbc2b24ea91e5d6380dc6a5055d7f09b",
   "main": "worker/index.ts",
   "compatibility_date": "2026-11-04",
   "upload_source_maps": true,
@@ -15,13 +18,12 @@
     "not_found_handling": "404-page",
     "run_worker_first": ["/api/*", "/admin", "/admin/*"]
   },
-  // Run `npx wrangler d1 create ki-movers-submissions` once, then paste the
-  // returned database_id here. The placeholder id is fine for local development.
+  // npm run deploy creates this database if it is missing and writes its id here.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "ki-movers-submissions",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "f6452302-12d5-4987-ae13-2f0beb4fe37b",
       "migrations_dir": "migrations"
     }
   ]

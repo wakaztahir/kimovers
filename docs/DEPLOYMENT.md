@@ -7,7 +7,10 @@ project root.
 ## Prerequisites
 
 - Node.js 20 or later (`node -v`).
-- A Cloudflare account.
+- A Cloudflare account. `wrangler.jsonc` pins `account_id`
+  (`fbc2b24ea91e5d6380dc6a5055d7f09b`, Alizskolqq@gmail.com), so a Wrangler login
+  with several account memberships still deploys to the right one. Change that
+  value to deploy elsewhere.
 - A domain on Cloudflare (optional for the first deploy — the site also works on
   the `*.workers.dev` address that Wrangler prints).
 
