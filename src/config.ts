@@ -31,7 +31,7 @@ export const business: Business = {
   phone: "+971 55 793 0734",
   phoneLink: "+971557930734",
   whatsapp: "971557930734",
-  email: "[Add verified email address]",
+  email: "kimovers2021@gmail.com",
   address: "Dubai, United Arab Emirates",
   website: siteUrl,
   yearsExperience: "[Add verified figure]",

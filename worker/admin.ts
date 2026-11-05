@@ -356,7 +356,7 @@ function settingsPage(
           <input id="resend_from" name="resend_from" type="text" value="${escapeHtml(settings.resendFrom)}" placeholder="KI Movers &lt;alerts@kimovers.com&gt;">
           <small>Must be an address on a domain verified in Resend.</small></div>
         <div class="field"><label for="email_to">Send notifications to</label>
-          <input id="email_to" name="email_to" type="text" value="${escapeHtml(settings.emailTo)}" placeholder="you@example.com"></div>
+          <input id="email_to" name="email_to" type="text" value="${escapeHtml(settings.emailTo)}" placeholder="kimovers2021@gmail.com"></div>
         <div class="row">
           <button class="secondary" type="submit" formaction="/admin/settings/test" name="channel" value="email">Send test email</button>
         </div>
