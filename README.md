@@ -83,17 +83,42 @@ npx wrangler d1 execute ki-movers-submissions --remote \
 `data/submissions.jsonl` belongs to the previous Node server and is no longer
 written to. Import any records you want to keep before removing it.
 
-### Admin page
+### Admin area
 
-`/admin` shows the latest 50 submissions, newest first, with the full JSON payload
-behind a details toggle. It sets `noindex`, `no-store` and its own CSP, and it is
-excluded in `robots.txt`.
+`/admin` is a small signed-in app:
 
-Access uses HTTP Basic auth with the single shared credential pair above. Until
-both secrets are set the page returns `503`; wrong or missing credentials get
-`401` with a `WWW-Authenticate` challenge. Workers are only served over HTTPS, so
-the credentials travel encrypted — still pick a long, unique password, and rotate
-it with `npx wrangler secret put ADMIN_PASSWORD` if it is ever shared.
+- `/admin` — the latest 50 enquiries, newest first, with the full JSON payload
+  behind a details toggle.
+- `/admin/settings` — notification settings: Resend API key, sender/recipient
+  addresses, WhatsApp provider and credentials, test buttons and the last ten
+  delivery attempts.
+- `POST /admin/logout` — deletes the session.
+
+Sign-in is a normal form at `/admin`, checked against the `ADMIN_USERNAME` and
+`ADMIN_PASSWORD` secrets. A correct sign-in stores a random token in an HttpOnly,
+SameSite=Strict cookie (Secure on HTTPS) and keeps only its SHA-256 hash in the
+`admin_sessions` table; sessions expire after seven days and signing out removes
+the row. Cross-site form posts are rejected by an `Origin` check, and wrong
+passwords cost a short delay. Until both secrets exist the area returns `503`.
+
+### Alerts for new enquiries
+
+Every quote or contact submission is stored in D1 and then, in the background,
+sent to you by:
+
+- **Email (Resend)** — `POST https://api.resend.com/emails` with the API key,
+  sender and recipient saved in `/admin/settings`. The sender domain must be
+  verified in Resend; the customer's address is set as `reply_to`.
+- **WhatsApp** — either the official **WhatsApp Cloud API** (phone number ID,
+  access token and recipient) or **CallMeBot** (phone + API key) for a personal
+  number. Meta only allows business-initiated messages as an approved template,
+  so set the template name and language; free-form text is used only when no
+  template is configured (valid within 24 hours of the customer messaging you).
+
+Both channels run through `ctx.waitUntil`, so a slow or failing provider never
+delays the form. Each attempt is written to `notification_log` and shown in the
+settings page, and `Send test email` / `Send test WhatsApp` verify the setup
+without creating a fake enquiry.
 
 ### Security and caching headers
 

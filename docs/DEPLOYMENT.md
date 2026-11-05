@@ -86,11 +86,37 @@ npm run seo:check
 npx wrangler deploy
 ```
 
-`npm run deploy` runs exactly these steps, so prefer it locally.
+`npm run deploy` runs exactly these steps, so prefer it locally. It also applies
+the `0002_settings_sessions_notifications.sql` migration that adds the settings,
+session and notification tables.
 
 For CI, set `CLOUDFLARE_API_TOKEN` (Workers Scripts + D1 edit permissions) and
 `CLOUDFLARE_ACCOUNT_ID` instead of `wrangler login`, then run the same command.
 Migrations skip their confirmation prompt when the process is not interactive.
+
+## Admin access and alerts
+
+After the first deploy, open `https://kimovers.com/admin` and sign in with the
+`ADMIN_USERNAME` / `ADMIN_PASSWORD` secrets. The login is a form backed by a
+signed-in session cookie (seven days), not HTTP Basic auth; sign out from the
+header when you are on a shared machine.
+
+Then open **Settings** and fill in:
+
+| Field | Where to get it |
+| --- | --- |
+| Resend API key | resend.com → API Keys (`re_…`) |
+| From address | An address on a domain verified in Resend, e.g. `KI Movers <alerts@kimovers.com>` |
+| Send notifications to | Your inbox |
+| WhatsApp | Cloud API: phone number ID + permanent token + recipient, with an approved template. CallMeBot: phone + API key |
+
+Use **Send test email** and **Send test WhatsApp** to confirm, and watch the
+"Recent notifications" table for provider errors. Settings live in D1, so they
+survive deploys and can be changed without touching secrets or code.
+
+Rotate `ADMIN_PASSWORD` with `npx wrangler secret put ADMIN_PASSWORD` whenever it
+has been shared; existing sessions stay valid until they expire, so also sign out
+other devices if needed.
 
 ## Custom domain
 

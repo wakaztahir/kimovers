@@ -1,4 +1,5 @@
 import { handleAdmin } from "./admin";
+import { notifySubmission } from "./notify";
 
 type SubmissionKind = "quote" | "contact";
 
@@ -63,7 +64,12 @@ function fieldValue(data: Record<string, unknown>, key: string): string {
   return String(value).trim();
 }
 
-async function handleSubmission(request: Request, env: Env, kind: SubmissionKind): Promise<Response> {
+async function handleSubmission(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  kind: SubmissionKind
+): Promise<Response> {
   let data: Record<string, unknown>;
   try {
     data = await readJsonObject(request);
@@ -120,18 +126,48 @@ async function handleSubmission(request: Request, env: Env, kind: SubmissionKind
     return jsonResponse({ error: "Unable to save request." }, 500);
   }
 
+  // Alerts run after the response is sent, so a slow or failing provider never
+  // delays the form. Each attempt is recorded in notification_log.
+  ctx.waitUntil(
+    notifySubmission(
+      env,
+      {
+        id,
+        kind,
+        submittedAt,
+        name: fieldValue(data, "name"),
+        phone: fieldValue(data, "phone"),
+        email: fieldValue(data, "email"),
+        service: fieldValue(data, "service"),
+        size: fieldValue(data, "size"),
+        from: fieldValue(data, "from"),
+        to: fieldValue(data, "to"),
+        date: fieldValue(data, "date"),
+        message: [fieldValue(data, "message"), fieldValue(data, "comments")].filter(Boolean).join("\n")
+      },
+      new URL(request.url).origin
+    ).catch((error: unknown) => {
+      console.error(
+        JSON.stringify({
+          message: "notification_dispatch_failed",
+          error: error instanceof Error ? error.message : String(error)
+        })
+      );
+    })
+  );
+
   return jsonResponse({ ok: true, id }, 201);
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "POST" && url.pathname === "/api/quote") {
-      return handleSubmission(request, env, "quote");
+      return handleSubmission(request, env, ctx, "quote");
     }
     if (request.method === "POST" && url.pathname === "/api/contact") {
-      return handleSubmission(request, env, "contact");
+      return handleSubmission(request, env, ctx, "contact");
     }
     if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
       return handleAdmin(request, env);
