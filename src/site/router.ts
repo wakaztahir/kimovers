@@ -1,5 +1,6 @@
 import { business as biz, siteUrl } from "../config";
 import { areaSlug, servicePath } from "./components";
+import { findGuide, guidePath, guidePage, guides, guidesPage } from "./guides";
 import { areas, faqs, posts, services } from "./content";
 import {
   aboutPage,
@@ -117,6 +118,17 @@ function faqSchema(): Record<string, unknown> {
       "@type": "Question",
       name: faq.question,
       acceptedAnswer: { "@type": "Answer", text: faq.answer }
+    }))
+  };
+}
+
+function faqItemsSchema(items: readonly { question: string; answer: string }[]): Record<string, unknown> {
+  return {
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer }
     }))
   };
 }
@@ -308,6 +320,35 @@ export function resolveRoute(rawPath: string): ResolvedRoute {
     });
   }
 
+  if (path === "/guides") {
+    return page(path, guidesPage(), {
+      title: `Moving guides and comparisons | ${biz.name}`,
+      description:
+        "Practical guides to moving in Dubai: cost drivers, service comparisons, checklists and the questions to ask before you book.",
+      breadcrumbs: [...HOME_BREADCRUMB, { name: "Practical guides", path: "/guides" }]
+    });
+  }
+
+  if (segments[0] === "guides" && segments[1]) {
+    const guide = findGuide(segments[1]);
+    const html = guidePage(segments[1]);
+    if (guide && html) {
+      return page(path, html, {
+        title: `${guide.seoTitle} | ${biz.name}`,
+        description: guide.description,
+        breadcrumbs: [
+          ...HOME_BREADCRUMB,
+          { name: "Practical guides", path: "/guides" },
+          { name: guide.title, path: guidePath(guide) }
+        ],
+        jsonLd: [
+          webPageSchema(guide.seoTitle, guide.description, path),
+          faqItemsSchema(guide.faqs)
+        ]
+      });
+    }
+  }
+
   return resolveNotFound(path);
 }
 
@@ -344,11 +385,15 @@ export function listRoutes(): SitemapRoute[] {
     routes.push({ path: `/areas/${areaSlug(area)}`, changefreq: "monthly", priority: 0.6 });
   }
   routes.push(
+    { path: "/guides", changefreq: "monthly", priority: 0.7 },
     { path: "/gallery", changefreq: "monthly", priority: 0.6 },
     { path: "/blog", changefreq: "weekly", priority: 0.7 }
   );
   for (const post of posts) {
     routes.push({ path: `/blog/${post.slug}`, changefreq: "yearly", priority: 0.5 });
+  }
+  for (const guide of guides) {
+    routes.push({ path: guidePath(guide), changefreq: "monthly", priority: 0.6 });
   }
   routes.push(
     { path: "/quote", changefreq: "yearly", priority: 0.9 },

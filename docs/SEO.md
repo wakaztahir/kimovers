@@ -80,6 +80,25 @@ The checker (`scripts/seo-check.mjs`) fails the build on:
   in `robots.txt`;
 - the placeholder `https://example.com` origin in a production build.
 
+## Practical guide pages
+
+`/guides` hosts fourteen cost, comparison and checklist pages aimed at
+pre-booking search intent ("how much do movers cost", "movers vs DIY", "how to
+compare quotes"). They are intentionally kept out of the main navigation and are
+discovered through `sitemap.xml` and the related-guide links on each page.
+
+Two constraints keep them out of trouble:
+
+- No competitor is named and no comparative claim is made about another company,
+  so the pages stay clear of comparative-advertising and trademark issues.
+- No price is quoted. Each page explains what drives the cost and what to ask,
+  which stays accurate for any move and cannot become a stale published price.
+
+Each page carries a unique title, description, `BreadcrumbList`, `WebPage` and a
+`FAQPage` block built from its own questions. To add another, append an entry to
+`guides` in `src/site/guides.ts`; routing, the sitemap and the hub page follow
+automatically.
+
 ## Post-launch checklist
 
 1. Confirm `https://kimovers.com` (without `www`) serves `200`, with `/`
