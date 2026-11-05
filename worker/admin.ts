@@ -1,6 +1,15 @@
 import { escapeHtml } from "../src/site/html";
 import { type Channel, sendTestNotification } from "./notify";
-import { hasSession, createSession, destroySession, isSameOrigin } from "./session";
+import {
+  createCsrfToken,
+  createSession,
+  csrfCookie,
+  destroySession,
+  hasAllowedOrigin,
+  hasSession,
+  readCsrfToken,
+  verifyCsrf
+} from "./session";
 import { loadSettings, saveSettings } from "./settings";
 
 const PAGE_LIMIT = 50;
@@ -154,13 +163,19 @@ function prettyPayload(raw: string): string {
   }
 }
 
-function layout(options: { title: string; active: "enquiries" | "settings"; body: string; footer?: string }): string {
+function layout(options: {
+  title: string;
+  active: "enquiries" | "settings";
+  body: string;
+  csrf: string;
+  footer?: string;
+}): string {
   const nav = `
     <nav>
       <a href="/admin"${options.active === "enquiries" ? ' aria-current="page"' : ""}>Enquiries</a>
       <a href="/admin/settings"${options.active === "settings" ? ' aria-current="page"' : ""}>Settings</a>
       <a href="/" target="_blank" rel="noopener">View site</a>
-      <form method="post" action="/admin/logout" style="margin:0"><button type="submit">Sign out</button></form>
+      <form method="post" action="/admin/logout" style="margin:0"><input type="hidden" name="csrf" value="${escapeHtml(options.csrf)}"><button type="submit">Sign out</button></form>
     </nav>`;
 
   return `<!doctype html>
@@ -179,7 +194,7 @@ function layout(options: { title: string; active: "enquiries" | "settings"; body
 </html>`;
 }
 
-function loginPage(error = "", status = 200): Response {
+function loginPage(csrf: string, error = "", status = 200, extra: Readonly<Record<string, string>> = {}): Response {
   const body = `<!doctype html>
 <html lang="en">
 <head>
@@ -215,6 +230,7 @@ function loginPage(error = "", status = 200): Response {
   <h1>Sign in to the admin panel</h1>
   <p class="sub">Enquiries and notification settings.</p>
   ${error ? `<p class="error">${escapeHtml(error)}</p>` : ""}
+  <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
   <label for="username">Username</label>
   <input id="username" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false">
   <label for="password">Password</label>
@@ -224,7 +240,7 @@ function loginPage(error = "", status = 200): Response {
 </form>
 </body>
 </html>`;
-  return html(body, status);
+  return html(body, status, extra);
 }
 
 function renderRow(row: SubmissionRow): string {
@@ -254,7 +270,12 @@ function renderRow(row: SubmissionRow): string {
     </tr>`;
 }
 
-function dashboardPage(rows: readonly SubmissionRow[], total: number): Response {
+function dashboardPage(
+  rows: readonly SubmissionRow[],
+  total: number,
+  csrf: string,
+  extra: Readonly<Record<string, string>> = {}
+): Response {
   const table =
     rows.length > 0
       ? `<table>
@@ -269,11 +290,14 @@ function dashboardPage(rows: readonly SubmissionRow[], total: number): Response 
     layout({
       title: "Enquiries",
       active: "enquiries",
+      csrf,
       body: `<h2>Enquiries</h2>
   <p class="lede">${total} total · showing the latest ${rows.length}. Email and WhatsApp alerts are configured in <a href="/admin/settings">Settings</a>.</p>
   ${table}`,
       footer: `Quote and contact form submissions, newest first. Limit ${PAGE_LIMIT}.`
-    })
+    }),
+    200,
+    extra
   );
 }
 
@@ -292,7 +316,9 @@ type NotificationRow = {
 function settingsPage(
   settings: Awaited<ReturnType<typeof loadSettings>>,
   notice: Notice | null,
-  recent: readonly NotificationRow[]
+  recent: readonly NotificationRow[],
+  csrf: string,
+  extra: Readonly<Record<string, string>> = {}
 ): Response {
   const cloud = settings.whatsappProvider === "cloud";
   const log =
@@ -313,10 +339,12 @@ function settingsPage(
     layout({
       title: "Settings",
       active: "settings",
+      csrf,
       body: `<h2>Notification settings</h2>
   <p class="lede">Every new quote or contact request is saved here and, when enabled, sent to you by email and WhatsApp.</p>
   ${noticeMarkup(notice)}
   <form method="post" action="/admin/settings">
+    <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
     <div class="grid">
       <section class="card">
         <h3>Email alerts (Resend)</h3>
@@ -370,7 +398,9 @@ function settingsPage(
   <p class="lede">The last ten delivery attempts, including errors returned by Resend or WhatsApp.</p>
   ${log}`,
       footer: "Keys are stored in this Worker's D1 database and only shown inside this signed-in page."
-    })
+    }),
+    200,
+    extra
   );
 }
 
@@ -403,14 +433,38 @@ async function loadRecentNotifications(env: Env): Promise<NotificationRow[]> {
   }
 }
 
-async function handleLogin(request: Request, env: Env): Promise<Response> {
-  if (!isSameOrigin(request)) return loginPage("Your session expired. Try again.", 403);
+function csrfFor(request: Request): { csrf: string; extra: Record<string, string> } {
+  const existing = readCsrfToken(request);
+  const csrf = existing ?? createCsrfToken();
+  return { csrf, extra: existing ? {} : { "set-cookie": csrfCookie(request, csrf) } };
+}
 
+function loginResponse(request: Request, error = "", status = 200): Response {
+  const { csrf, extra } = csrfFor(request);
+  return loginPage(csrf, error, status, extra);
+}
+
+function settingsResponse(
+  request: Request,
+  env: Env,
+  notice: Notice | null
+): Promise<Response> {
+  const { csrf, extra } = csrfFor(request);
+  return loadSettings(env).then((settings) =>
+    loadRecentNotifications(env).then((recent) => settingsPage(settings, notice, recent, csrf, extra))
+  );
+}
+
+async function handleLogin(request: Request, env: Env): Promise<Response> {
   let form: URLSearchParams;
   try {
     form = await readForm(request);
   } catch {
-    return loginPage("That sign-in attempt could not be read.", 400);
+    return loginResponse(request, "That sign-in attempt could not be read.", 400);
+  }
+
+  if (!hasAllowedOrigin(request) || !(await verifyCsrf(request, form.get("csrf")))) {
+    return loginResponse(request, "The form could not be verified. Reload the page and try again.", 403);
   }
 
   const username = form.get("username")?.trim() ?? "";
@@ -425,7 +479,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   if (!usernameMatches || !passwordMatches) {
     // A small delay blunts scripted guessing without a separate rate-limit store.
     await new Promise((resolve) => setTimeout(resolve, 400));
-    return loginPage("That username or password is not correct.", 401);
+    return loginResponse(request, "That username or password is not correct.", 401);
   }
 
   const session = await createSession(env, request);
@@ -437,7 +491,14 @@ async function handleSettingsSave(request: Request, env: Env): Promise<Response>
   try {
     form = await readForm(request);
   } catch {
-    return settingsPage(await loadSettings(env), { tone: "error", message: "That form could not be read." }, await loadRecentNotifications(env));
+    return settingsResponse(request, env, { tone: "error", message: "That form could not be read." });
+  }
+
+  if (!hasAllowedOrigin(request) || !(await verifyCsrf(request, form.get("csrf")))) {
+    return settingsResponse(request, env, {
+      tone: "error",
+      message: "The form could not be verified. Reload the page and try again."
+    });
   }
 
   const provider = form.get("whatsapp_provider") === "callmebot" ? "callmebot" : "cloud";
@@ -459,11 +520,7 @@ async function handleSettingsSave(request: Request, env: Env): Promise<Response>
     callmebot_api_key: value("callmebot_api_key")
   });
 
-  return settingsPage(
-    await loadSettings(env),
-    { tone: "ok", message: "Settings saved." },
-    await loadRecentNotifications(env)
-  );
+  return settingsResponse(request, env, { tone: "ok", message: "Settings saved." });
 }
 
 async function handleSettingsTest(request: Request, env: Env): Promise<Response> {
@@ -471,7 +528,14 @@ async function handleSettingsTest(request: Request, env: Env): Promise<Response>
   try {
     form = await readForm(request);
   } catch {
-    return settingsPage(await loadSettings(env), { tone: "error", message: "That request could not be read." }, await loadRecentNotifications(env));
+    return settingsResponse(request, env, { tone: "error", message: "That request could not be read." });
+  }
+
+  if (!hasAllowedOrigin(request) || !(await verifyCsrf(request, form.get("csrf")))) {
+    return settingsResponse(request, env, {
+      tone: "error",
+      message: "The form could not be verified. Reload the page and try again."
+    });
   }
 
   const channel: Channel = form.get("channel") === "whatsapp" ? "whatsapp" : "email";
@@ -483,11 +547,7 @@ async function handleSettingsTest(request: Request, env: Env): Promise<Response>
       ? `Test ${channel} sent. ${result.detail}`
       : `Test ${channel} ${result.status}: ${result.detail}`;
 
-  return settingsPage(
-    await loadSettings(env),
-    { tone: result.status === "sent" ? "ok" : "error", message },
-    await loadRecentNotifications(env)
-  );
+  return settingsResponse(request, env, { tone: result.status === "sent" ? "ok" : "error", message });
 }
 
 export async function handleAdmin(request: Request, env: Env): Promise<Response> {
@@ -514,8 +574,8 @@ export async function handleAdmin(request: Request, env: Env): Promise<Response>
 
   const authed = await hasSession(request, env);
   if (!authed) {
-    if (method === "GET" || method === "HEAD") return loginPage();
-    return loginPage("Please sign in first.", 401);
+    if (method === "GET" || method === "HEAD") return loginResponse(request);
+    return loginResponse(request, "Please sign in first.", 401);
   }
 
   if (path === "/admin" || path === "/admin/index") {
@@ -523,7 +583,8 @@ export async function handleAdmin(request: Request, env: Env): Promise<Response>
     if (method === "HEAD") return new Response(null, { status: 200, headers: pageHeaders() });
     try {
       const submissions = await loadSubmissions(env);
-      return dashboardPage(submissions.rows, submissions.total);
+      const { csrf, extra } = csrfFor(request);
+      return dashboardPage(submissions.rows, submissions.total, csrf, extra);
     } catch (error) {
       console.error(
         JSON.stringify({
@@ -537,21 +598,16 @@ export async function handleAdmin(request: Request, env: Env): Promise<Response>
 
   if (path === "/admin/settings") {
     if (method === "GET" || method === "HEAD") {
-      const page = settingsPage(await loadSettings(env), null, await loadRecentNotifications(env));
+      const { csrf, extra } = csrfFor(request);
+      const page = settingsPage(await loadSettings(env), null, await loadRecentNotifications(env), csrf, extra);
       if (method === "HEAD") return new Response(null, { status: 200, headers: pageHeaders() });
       return page;
     }
-    if (method === "POST") {
-      if (!isSameOrigin(request)) return textResponse("Cross-site request blocked.", 403);
-      return handleSettingsSave(request, env);
-    }
+    if (method === "POST") return handleSettingsSave(request, env);
     return textResponse("Method not allowed.", 405, { allow: "GET, HEAD, POST" });
   }
 
-  if (path === "/admin/settings/test" && method === "POST") {
-    if (!isSameOrigin(request)) return textResponse("Cross-site request blocked.", 403);
-    return handleSettingsTest(request, env);
-  }
+  if (path === "/admin/settings/test" && method === "POST") return handleSettingsTest(request, env);
 
   return textResponse("Not found.", 404);
 }

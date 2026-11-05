@@ -80,13 +80,56 @@ export async function destroySession(request: Request, env: Env): Promise<string
   return `${COOKIE_NAME}=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0${secure}`;
 }
 
-/** Rejects cross-site form posts. Same-origin browser posts always send Origin. */
-export function isSameOrigin(request: Request): boolean {
+/**
+ * Extra signal only: browsers are inconsistent about sending Origin (Safari and
+ * privacy tools often omit it), so a missing header is not treated as hostile.
+ * The CSRF token below is what actually protects the forms.
+ */
+export function hasAllowedOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
-  if (!origin) return false;
+  if (!origin) return true;
   try {
     return origin === new URL(request.url).origin;
   } catch {
     return false;
   }
+}
+
+const CSRF_COOKIE = "ki_csrf";
+const CSRF_TTL_SECONDS = 24 * 60 * 60;
+
+export function readCsrfToken(request: Request): string | null {
+  const token = readCookie(request, CSRF_COOKIE);
+  return token && token.length >= 20 ? token : null;
+}
+
+export function createCsrfToken(): string {
+  return base64Url(crypto.getRandomValues(new Uint8Array(24)));
+}
+
+/** Pairs a form token with the browser cookie (double-submit). */
+export function csrfCookie(request: Request, token: string): string {
+  const secure = isSecureRequest(request) ? "; Secure" : "";
+  return `${CSRF_COOKIE}=${token}; Path=/admin; SameSite=Strict; Max-Age=${CSRF_TTL_SECONDS}${secure}; HttpOnly`;
+}
+
+export async function verifyCsrf(request: Request, submitted: string | null): Promise<boolean> {
+  const stored = readCsrfToken(request);
+  if (!stored || !submitted) return false;
+  return secureStringEquals(stored, submitted);
+}
+
+async function secureStringEquals(left: string, right: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const [leftDigest, rightDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(left)),
+    crypto.subtle.digest("SHA-256", encoder.encode(right))
+  ]);
+  const a = new Uint8Array(leftDigest);
+  const b = new Uint8Array(rightDigest);
+  let difference = a.length ^ b.length;
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    difference |= (a[index] ?? 0) ^ (b[index] ?? 0);
+  }
+  return difference === 0;
 }
